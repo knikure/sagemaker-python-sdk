@@ -3,7 +3,7 @@
     :alt: SageMaker
 
 ====================
-SageMaker Python SDK test
+SageMaker Python SDK
 ====================
 
 .. image:: https://img.shields.io/pypi/v/sagemaker.svg
