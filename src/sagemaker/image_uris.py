@@ -155,6 +155,7 @@ def retrieve(
                 _framework = f"{framework}-{inference_tool}"
         _validate_for_suppported_frameworks_and_instance_type(framework, instance_type)
         image_scope = _get_image_scope_for_instance_type(_framework, instance_type, image_scope)
+        _validate_for_suppported_frameworks_and_instance_type(framework, instance_type)
         config = _config_for_framework_and_scope(_framework, image_scope, accelerator_type)
 
     original_version = version
