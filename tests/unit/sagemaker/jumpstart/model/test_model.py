@@ -102,6 +102,7 @@ class ModelTest(unittest.TestCase):
             instance_type="ml.p2.xlarge",
             wait=True,
             endpoint_name="blahblahblah-7777",
+            endpoint_logging=False,
         )
 
     @mock.patch("sagemaker.jumpstart.model.is_valid_model_id")
@@ -156,6 +157,7 @@ class ModelTest(unittest.TestCase):
             initial_instance_count=1,
             instance_type="ml.p3.2xlarge",
             wait=True,
+            endpoint_logging=False,
         )
 
     @mock.patch("sagemaker.utils.sagemaker_timestamp")
@@ -311,6 +313,7 @@ class ModelTest(unittest.TestCase):
             "container_startup_health_check_timeout": 2,
             "inference_recommendation_id": "None",
             "explainer_config": "None",
+            "endpoint_logging": False,
         }
 
         self.evaluate_model_workflow_with_kwargs(

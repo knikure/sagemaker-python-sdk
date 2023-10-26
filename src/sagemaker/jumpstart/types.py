@@ -1066,6 +1066,7 @@ class JumpStartModelDeployKwargs(JumpStartKwargs):
         "tolerate_deprecated_model",
         "sagemaker_session",
         "accept_eula",
+        "endpoint_logging",
     ]
 
     SERIALIZATION_EXCLUSION_SET = {
@@ -1103,6 +1104,7 @@ class JumpStartModelDeployKwargs(JumpStartKwargs):
         tolerate_vulnerable_model: Optional[bool] = None,
         sagemaker_session: Optional[Session] = None,
         accept_eula: Optional[bool] = None,
+        endpoint_logging: Optional[bool] = None,
     ) -> None:
         """Instantiates JumpStartModelDeployKwargs object."""
 
@@ -1130,6 +1132,7 @@ class JumpStartModelDeployKwargs(JumpStartKwargs):
         self.tolerate_deprecated_model = tolerate_deprecated_model
         self.sagemaker_session = sagemaker_session
         self.accept_eula = accept_eula
+        self.endpoint_logging = endpoint_logging
 
 
 class JumpStartEstimatorInitKwargs(JumpStartKwargs):
