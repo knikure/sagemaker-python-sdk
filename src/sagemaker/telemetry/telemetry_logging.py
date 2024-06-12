@@ -59,77 +59,88 @@ def _telemetry_emitter(feature: str, func_name: str):
     """Decorator to emit telemetry logs for SageMaker Python SDK functions"""
 
     def decorator(func):
-        def wrapper(self, *args, **kwargs):
-            logger.info(TELEMETRY_OPT_OUT_MESSAGING)
-            response = None
-            caught_ex = None
-            studio_app_type = process_studio_metadata_file()
+        def wrapper(*args, **kwargs):
+            # Retrieve self instance from the first argument of the function
+            self_instance = args[0]
+            if self_instance.sagemaker_session:
+                logger.debug("sagemaker_session found, preparing to emit telemetry...")
+                logger.info(TELEMETRY_OPT_OUT_MESSAGING)
+                response = None
+                caught_ex = None
+                studio_app_type = process_studio_metadata_file()
 
-            # Check if telemetry is opted out
-            telemetry_opt_out_flag = resolve_value_from_config(
-                direct_input=None,
-                config_path=TELEMETRY_OPT_OUT_PATH,
-                default_value=False,
-                sagemaker_session=self.sagemaker_session,
-            )
-            logger.debug("TelemetryOptOut flag is set to: %s", telemetry_opt_out_flag)
+                # Check if telemetry is opted out
+                telemetry_opt_out_flag = resolve_value_from_config(
+                    direct_input=None,
+                    config_path=TELEMETRY_OPT_OUT_PATH,
+                    default_value=False,
+                    sagemaker_session=self_instance.sagemaker_session,
+                )
+                logger.debug("TelemetryOptOut flag is set to: %s", telemetry_opt_out_flag)
 
-            # Construct the feature list to track feature combinations
-            feature_list: List[int] = [FEATURE_TO_CODE[str(feature)]]
-            if self.sagemaker_session:
-                if self.sagemaker_session.sagemaker_config and feature != Feature.SDK_DEFAULTS:
+                # Construct the feature list to track feature combinations
+                feature_list: List[int] = [FEATURE_TO_CODE[str(feature)]]
+
+                if (
+                    self_instance.sagemaker_session.sagemaker_config
+                    and feature != Feature.SDK_DEFAULTS
+                ):
                     feature_list.append(FEATURE_TO_CODE[str(Feature.SDK_DEFAULTS)])
 
-                if self.sagemaker_session.local_mode and feature != Feature.LOCAL_MODE:
+                if self_instance.sagemaker_session.local_mode and feature != Feature.LOCAL_MODE:
                     feature_list.append(FEATURE_TO_CODE[str(Feature.LOCAL_MODE)])
 
-            # Construct the extra info to track platform and environment usage metadata
-            extra = (
-                f"{func_name}"
-                f"&x-sdkVersion={SDK_VERSION}"
-                f"&x-env={PYTHON_VERSION}"
-                f"&x-sys={OS_NAME_VERSION}"
-                f"&x-platform={studio_app_type}"
-            )
+                # Construct the extra info to track platform and environment usage metadata
+                extra = (
+                    f"{func_name}"
+                    f"&x-sdkVersion={SDK_VERSION}"
+                    f"&x-env={PYTHON_VERSION}"
+                    f"&x-sys={OS_NAME_VERSION}"
+                    f"&x-platform={studio_app_type}"
+                )
 
-            # Add endpoint ARN to the extra info if available
-            if self.sagemaker_session and self.sagemaker_session.endpoint_arn:
-                extra += f"&x-endpointArn={self.sagemaker_session.endpoint_arn}"
+                # Add endpoint ARN to the extra info if available
+                if self_instance.sagemaker_session.endpoint_arn:
+                    extra += f"&x-endpointArn={self_instance.sagemaker_session.endpoint_arn}"
 
-            start_timer = perf_counter()
-            try:
-                # Call the original function
-                response = func(self, *args, **kwargs)
-                stop_timer = perf_counter()
-                elapsed = stop_timer - start_timer
-                extra += f"&x-latency={round(elapsed, 2)}"
-                if not telemetry_opt_out_flag:
-                    _send_telemetry_request(
-                        STATUS_TO_CODE[str(Status.SUCCESS)],
-                        feature_list,
-                        self.sagemaker_session,
-                        None,
-                        None,
-                        extra,
-                    )
-            except Exception as e:  # pylint: disable=W0703
-                stop_timer = perf_counter()
-                elapsed = stop_timer - start_timer
-                extra += f"&x-latency={round(elapsed, 2)}"
-                if not telemetry_opt_out_flag:
-                    _send_telemetry_request(
-                        STATUS_TO_CODE[str(Status.FAILURE)],
-                        feature_list,
-                        self.sagemaker_session,
-                        str(e),
-                        e.__class__.__name__,
-                        extra,
-                    )
-                caught_ex = e
-            finally:
-                if caught_ex:
-                    raise caught_ex
-                return response  # pylint: disable=W0150
+                start_timer = perf_counter()
+                try:
+                    # Call the original function
+                    response = func(*args, **kwargs)
+                    stop_timer = perf_counter()
+                    elapsed = stop_timer - start_timer
+                    extra += f"&x-latency={round(elapsed, 2)}"
+                    if not telemetry_opt_out_flag:
+                        _send_telemetry_request(
+                            STATUS_TO_CODE[str(Status.SUCCESS)],
+                            feature_list,
+                            self_instance.sagemaker_session,
+                            None,
+                            None,
+                            extra,
+                        )
+                except Exception as e:  # pylint: disable=W0703
+                    stop_timer = perf_counter()
+                    elapsed = stop_timer - start_timer
+                    extra += f"&x-latency={round(elapsed, 2)}"
+                    if not telemetry_opt_out_flag:
+                        _send_telemetry_request(
+                            STATUS_TO_CODE[str(Status.FAILURE)],
+                            feature_list,
+                            self_instance.sagemaker_session,
+                            str(e),
+                            e.__class__.__name__,
+                            extra,
+                        )
+                    caught_ex = e
+                finally:
+                    if caught_ex:
+                        raise caught_ex
+                    return response  # pylint: disable=W0150
+            else:
+                logger.debug("No sagemaker_session found, telemetry will not be emitted!")
+                response = func(*args, **kwargs)
+                return response
 
         return wrapper
 
@@ -165,9 +176,9 @@ def _send_telemetry_request(
         # Send the telemetry request
         logger.debug("Sending telemetry request to [%s]", url)
         _requests_helper(url, 2)
-        logger.debug("SageMaker Python SDK telemetry successfully emitted!")
+        logger.debug("SageMaker Python SDK telemetry successfully emitted.")
     except Exception:  # pylint: disable=W0703
-        logger.debug("SageMaker Python SDK telemetry not emitted!!")
+        logger.debug("SageMaker Python SDK telemetry not emitted!")
 
 
 def _construct_url(
